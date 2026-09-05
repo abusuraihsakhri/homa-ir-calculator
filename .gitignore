@@ -1,5 +1,15 @@
 __pycache__/
 *.pyc
+*.pyo
+.pytest_cache/
 .venv/
+venv/
+env/
 results.csv
 output.csv
+*.egg-info/
+dist/
+build/
+.coverage
+htmlcov/
+.DS_Store

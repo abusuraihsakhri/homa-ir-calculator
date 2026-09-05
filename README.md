@@ -1,16 +1,11 @@
-# Homa Ir Calculator
+# HOMA-IR & HOMA-B Calculator
 
-> **Domain:** Clinical Decision Support & Biomedical Computing  
-> **Reference Guidelines & Standards:** `Standard Clinical Formulations & ISO/IEC Quality Frameworks`
+> **Domain:** Clinical Decision Support & Biomedical Computing
 
 <div align="center">
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 ![Python](https://img.shields.io/badge/Python-3.10%20%7C%203.11%20%7C%203.12-3776AB.svg?logo=python&logoColor=white)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.111-009688.svg?logo=fastapi&logoColor=white)
-![Audit Trail](https://img.shields.io/badge/Audit-HMAC--SHA256_Tamper--Evident-brightgreen.svg)
-![Zero-PHI Guard](https://img.shields.io/badge/Guard-Zero--PHI_Outbound-blue.svg)
-![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg?logo=docker&logoColor=white)
 
 </div>
 
@@ -18,73 +13,67 @@
 
 ## 📖 What It Does
 
-HOMA-IR & HOMA-B Calculator
-HOMA-IR and HOMA-B from fasting glucose/insulin with insulin-resistance cutoffs.
-Stdlib only.
+A clinical calculator for HOMA-IR (insulin resistance) and HOMA-B (beta-cell function) from fasting glucose and insulin measurements. Also supports additional clinical scores: MELD-Na, QTc, BMI z-score, HbA1c conversion, APRI, and FIB-4.
 
 ---
 
-## ⚙️ Key Capabilities & Algorithmic Modules
+## ⚙️ Key Features
 
-### 🔬 Analytical Functions
+### 🔬 Clinical Calculations
 
-- **`calculate_score()`**: Generic formula stub: weighted sum of numeric inputs.
-- **`assess_row()`** — calculates and validates assess_row parameters.
-- **`process_csv()`** — calculates and validates process_csv parameters.
-- **`build_parser()`** — calculates and validates build_parser parameters.
-- **`main()`** — calculates and validates main parameters.
-
----
-
-## 📐 Mathematical Formulation & Logic
-
-```text
-  """Generic formula stub: weighted sum of numeric inputs."""
-  score = sum(vals) * (0.9 + h*0.02) + math.log1p(len(vals))
-  return calculate_score(**row)
-```
+- **HOMA-IR** — Insulin resistance: `(glucose_mmol * insulin_mu_u_ml) / 22.5`. Values > 2.5 suggest insulin resistance.
+- **HOMA-B** — Beta-cell function: `(20 * insulin_mu_u_ml) / (glucose_mmol - 3.5)`.
+- **MELD-Na** — Liver disease severity score.
+- **QTc** — Corrected QT interval (Bazett's and Fridericia's formulas).
+- **BMI z-score** — Body mass index with age-adjusted z-score.
+- **HbA1c** — Convert between HbA1c (%) and estimated average glucose.
+- **APRI / FIB-4** — Liver fibrosis scores.
 
 ---
 
 ## 💻 CLI Quickstart & Usage
 
-### 1. Guided Interactive Mode
+### 1. Single HOMA-IR/HOMA-B Calculation
+
 ```bash
-python cli.py
+# Using mmol/L
+python homa.py single --glucose-mmol 5.0 --insulin 10.0
+
+# Using mg/dL (auto-converted)
+python homa.py single --glucose-mgdl 90 --insulin 10.0
+
+# Using JSON input
+python homa.py single --json '{"glucose_mmol": 5.0, "insulin_mu_u_ml": 10.0}'
 ```
 
-### 2. Direct Parameterized Evaluation
+### 2. Batch CSV Processing
+
 ```bash
-python cli.py --task-id <value> --target <value> --primary <value> --secondary <value>
+python homa.py batch --input sample.csv --output results.csv
 ```
 
-### Parameter Reference
-- `--task-id`: Specifies input measurement or parameter value.
-- `--target`: Specifies input measurement or parameter value.
-- `--primary`: Specifies input measurement or parameter value.
-- `--secondary`: Specifies input measurement or parameter value.
-- `--critical`: Specifies input measurement or parameter value.
-- `--status`: Specifies input measurement or parameter value.
-- `--input`: Specifies input measurement or parameter value.
-- `--output`: Specifies input measurement or parameter value.
+### CSV Input Format
 
-### Input Data Schema
+| Field | Description | Required |
+|:------|:------------|:----------|
+| `glucose_mmol` | Fasting glucose in mmol/L | * |
+| `glucose_mgdl` | Fasting glucose in mg/dL (alternative) | * |
+| `insulin_mu_u_ml` | Fasting insulin in μU/mL | * |
 
-| Field | Description | Requirement |
-|:------|:------------|:------------|
-| `id` | Parameter / observation metric | Required |
-| `value` | Parameter / observation metric | Required |
-| `qty` | Parameter / observation metric | Required |
+*One of `glucose_mmol` or `glucose_mgdl` is required, plus `insulin_mu_u_ml`.
 
 ---
 
-## 🛡️ Security & Enterprise Architecture
+## 🛡️ Security
 
-* **Zero-PHI Outbound Interceptor:** Active AST and regex inspection blocking SSNs, MRNs, phone numbers, and patient identifiers.
-* **Tamper-Evident HMAC-SHA256 Audit Trail:** Chained, cryptographically signed logs for every evaluation and state transition.
-* **Air-Gapped LLM Reasoning Adapter:** Agnostic integration for local Ollama instances (`llama3`, `mistral`), Claude 3.5 Sonnet, GPT-4o, and deterministic test mocks.
-* **Active Learning Bayesian Calibration:** Dynamic tracker updating worker reliability weights and monitoring Brier calibration drift.
-* **FastAPI & Prometheus Telemetry:** Exposes OpenAPI 3.1 REST endpoints and operational Prometheus metrics (`/metrics`).
+- **Audit Trail:** HMAC-SHA256 tamper-evident logging for all calculations.
+- **PHI Guard:** Optional outbound PHI detection (MRN, SSN, phone numbers, etc.).
+- **Input Validation:** Path traversal protection on file operations.
+
+Set a secure audit secret key:
+```bash
+export AUDIT_SECRET_KEY=$(python -c "import secrets; print(secrets.token_hex(32))")
+```
 
 ---
 
@@ -93,13 +82,11 @@ python cli.py --task-id <value> --target <value> --primary <value> --secondary <
 Run the automated test suite:
 
 ```bash
+# Set test secret key
+export AUDIT_SECRET_KEY="test-secret-key-for-unit-tests"
+
+# Run tests
 pytest -v
-```
-
-Execute high-throughput batch simulation benchmarks:
-
-```bash
-python simulator.py --tasks 1000 --concurrency 8
 ```
 
 ---
@@ -108,5 +95,28 @@ python simulator.py --tasks 1000 --concurrency 8
 
 ```bash
 docker build -t homa-ir-calculator .
-docker run -p 8000:8000 homa-ir-calculator
+docker run -e AUDIT_SECRET_KEY=$(python -c "import secrets; print(secrets.token_hex(32))") -p 8000:8000 homa-ir-calculator
+```
+
+---
+
+## 📁 Project Structure
+
+```
+homa-ir-calculator/
+├── homa.py              # Core calculator (HOMA-IR, HOMA-B, clinical scores)
+├── cli.py               # CLI entry point with agent system
+├── test_homa.py         # Core calculator tests
+├── agents/              # Enterprise agent system
+│   ├── base.py          # Security, PHI guard, audit trail
+│   ├── models.py        # Pydantic data models
+│   ├── supervisor.py    # Multi-agent orchestrator
+│   ├── workers.py       # Specialized clinical workers
+│   └── api.py           # FastAPI REST server
+├── tests/               # Integration tests
+│   ├── test_homa_ir_calculator.py
+│   └── test_enrichment.py
+├── enrichment.py        # Enrichment feature modules
+├── simulator.py         # High-throughput stress testing
+└── Dockerfile           # Container build
 ```
