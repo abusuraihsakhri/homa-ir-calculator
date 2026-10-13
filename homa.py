@@ -243,6 +243,18 @@ def _validate_safe_path(path_str: str) -> str:
     return safe_path
 
 
+def _safe_csv_cell(value):
+    """Prefix cells that Excel/other spreadsheet programs may execute as formulas."""
+    if not isinstance(value, str):
+        return value
+    stripped = value.lstrip()
+    if stripped.startswith(("=", "+", "@", "\t", "\r")) or (
+        stripped.startswith("-") and not stripped[1:].replace(".", "", 1).isdigit()
+    ):
+        return "'" + value
+    return value
+
+
 def process_csv(inp, out):
     safe_inp = _validate_safe_path(inp)
     safe_out = _validate_safe_path(out)
@@ -269,7 +281,7 @@ def process_csv(inp, out):
     with open(safe_out, "w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=list(fieldnames) + extra)
         w.writeheader()
-        w.writerows(results)
+        w.writerows({k: _safe_csv_cell(v) for k, v in record.items()} for record in results)
     return results
 
 
