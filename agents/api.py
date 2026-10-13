@@ -16,7 +16,7 @@ supervisor = SystemSupervisor(model_provider="mock")
 
 app = FastAPI(
     title="Homa Ir Calculator API",
-    description="Enterprise Distributed Component Platform (Clinical & Biomedical AI)",
+    description="HOMA1 calculations and optional demonstration audit workflows",
     version="3.0.0-ENTERPRISE",
 )
 
@@ -55,7 +55,7 @@ def api_homa(payload: HomaRequest):
 
 @app.get("/health")
 def health():
-    return {"status": "HEALTHY", "service": "homa-ir-calculator", "domain": "Clinical & Biomedical AI", "standard": "CAP / CLSI / ISO Standards", "version": "3.0.0-ENTERPRISE"}
+    return {"status": "HEALTHY", "service": "homa-ir-calculator", "domain": "Clinical & Biomedical AI", "standard": "Demonstration rules only", "version": "3.0.0-ENTERPRISE"}
 
 
 @app.get("/metrics")
