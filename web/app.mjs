@@ -79,7 +79,7 @@ export function toCsv(rows, fields) {
   return [fields.map(escapeCell).join(','), ...rows.map(row => fields.map(k => escapeCell(row[k])).join(','))].join('\r\n') + '\r\n';
 }
 
-const calculator = document.getElementById('calculator');
+const calculator = typeof document === 'undefined' ? null : document.getElementById('calculator');
 if (calculator) {
   const $ = id => document.getElementById(id);
   const results = $('results');
