@@ -1,40 +1,75 @@
-name: Homa Ir Calculator CI/CD & Security Verification
+name: Tests and security checks
 
 on:
   push:
-    branches: [ master, main ]
+    branches: [master, main]
   pull_request:
-    branches: [ master, main ]
+    branches: [master, main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
-  test-and-audit:
+  verify:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         python-version: ["3.10", "3.11", "3.12"]
-
+    env:
+      AUDIT_SECRET_KEY: ci-test-only-not-a-production-secret
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt pytest
+      - name: Compile Python sources
+        run: python -m compileall -q homa.py cli.py agents tests
+      - name: Python regression tests
+        run: python -m pytest -q
+      - name: Browser arithmetic and CSV tests
+        run: node --test tests/test_browser.mjs
+      - name: Validate audit signing and PHI pattern guard
+        run: |
+          python - <<'PY'
+          from agents.base import AuditLogger, PHIGuard, SecurityException
+          AuditLogger.log("CI", "test", "INTEGRITY_CHECK", {"result": "OK"})
+          assert AuditLogger.verify_integrity()
+          try:
+              PHIGuard.assert_no_phi("MRN-123456")
+          except SecurityException:
+              pass
+          else:
+              raise AssertionError("PHI example was not identified")
+          PY
 
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v5
-      with:
-        python-version: ${{ matrix.python-version }}
+  container:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Docker production build
+        run: docker build -t homa-ir-calculator:test .
 
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install fastapi uvicorn pydantic pytest
-
-    - name: Run Pytest Suite
-      run: |
-        pytest -v
-
-    - name: Security SAST & Zero-PHI Audit
-      run: |
-        python -c "
-        from agents.base import PHIGuard, AuditLogger
-        import pytest
-        assert AuditLogger.verify_integrity() is True
-        print('Security & Zero-PHI Audit Passed!')
-        "
+  dependency-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Audit resolved Python runtime dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pip-audit
+          pip-audit -r requirements.txt

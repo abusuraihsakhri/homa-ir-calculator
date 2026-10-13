@@ -1,9 +1,9 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "Homa Ir Calculator API",
-    "description": "Enterprise Distributed Component Platform (Clinical & Cryptographic AI) adhering to CAP / CLSI / NIST Standards.",
-    "version": "3.0.0-ENTERPRISE",
+    "title": "HOMA1 Calculator and Demonstration API",
+    "description": "HOMA1 arithmetic and optional generic demonstration agent workflows. No independently validated clinical interpretation.",
+    "version": "3.0.0",
     "contact": {
       "name": "Dr. Abu Suraih Sakhri",
       "url": "https://github.com/abusuraihsakhri"
@@ -15,7 +15,7 @@
         "summary": "Health and metadata check",
         "responses": {
           "200": {
-            "description": "System optimal"
+            "description": "Application process health metadata"
           }
         }
       }
@@ -25,7 +25,7 @@
         "summary": "Prometheus operational metrics",
         "responses": {
           "200": {
-            "description": "Prometheus text metrics"
+            "description": "JSON summary of in-memory dossier and audit counts"
           }
         }
       }
@@ -76,7 +76,7 @@
     },
     "/api/chat": {
       "post": {
-        "summary": "Air-gapped supervisory conversational assistant",
+        "summary": "Return a local mock supervisory response (not an LLM)",
         "requestBody": {
           "content": {
             "application/json": {
@@ -107,6 +107,49 @@
         "responses": {
           "200": {
             "description": "Cryptographic audit trail"
+          }
+        }
+      }
+    },
+    "/api/homa": {
+      "post": {
+        "summary": "Calculate HOMA1 indices from fasting glucose and insulin",
+        "description": "Supply glucose in mmol/L or mg/dL and insulin in µU/mL; output is not a clinical diagnosis.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "glucose_mmol": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "description": "Use this or glucose_mgdl"
+                  },
+                  "glucose_mgdl": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "description": "Use this or glucose_mmol"
+                  },
+                  "insulin_mu_u_ml": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  }
+                },
+                "required": [
+                  "insulin_mu_u_ml"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "HOMA1-IR and HOMA1-%B (nullable when glucose ≤ 3.5 mmol/L)"
+          },
+          "422": {
+            "description": "Invalid or missing inputs"
           }
         }
       }

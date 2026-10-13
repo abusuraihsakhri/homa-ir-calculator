@@ -1,236 +1,91 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Homa Ir Calculator — Operations Console</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            --bg: #090d16;
-            --card: #111827;
-            --border: #1f293d;
-            --accent: #3b82f6;
-            --accent-glow: rgba(59, 130, 246, 0.25);
-            --text: #f3f4f6;
-            --text-muted: #9ca3af;
-            --danger: #ef4444;
-            --warning: #f59e0b;
-            --success: #10b981;
-        }
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body {
-            font-family: 'Inter', sans-serif;
-            background: var(--bg);
-            color: var(--text);
-            padding: 2rem;
-            min-height: 100vh;
-        }
-        .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 1px solid var(--border);
-            padding-bottom: 1.5rem;
-            margin-bottom: 2rem;
-        }
-        .header-title h1 { font-size: 1.6rem; font-weight: 700; color: #fff; }
-        .header-title p { color: var(--text-muted); font-size: 0.9rem; margin-top: 0.25rem; }
-        .badge {
-            display: inline-block;
-            padding: 0.3rem 0.8rem;
-            border-radius: 9999px;
-            font-size: 0.75rem;
-            font-weight: 600;
-            background: var(--accent-glow);
-            color: var(--accent);
-            border: 1px solid var(--accent);
-        }
-        .grid {
-            display: grid;
-            grid-template-columns: 1fr 1.2fr;
-            gap: 1.5rem;
-        }
-        .card {
-            background: var(--card);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 1.5rem;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
-        }
-        .card h2 {
-            font-size: 1.1rem;
-            font-weight: 600;
-            margin-bottom: 1rem;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-        .form-group { margin-bottom: 1rem; }
-        label { display: block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.4rem; }
-        input, select, textarea {
-            width: 100%;
-            padding: 0.65rem 0.9rem;
-            background: #0d1322;
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            color: #fff;
-            font-family: inherit;
-            font-size: 0.9rem;
-        }
-        input:focus, textarea:focus { outline: none; border-color: var(--accent); }
-        .btn {
-            background: var(--accent);
-            color: #fff;
-            border: none;
-            padding: 0.7rem 1.4rem;
-            border-radius: 6px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: 0.2s;
-            width: 100%;
-        }
-        .btn:hover { background: #2563eb; }
-        .terminal {
-            background: #060911;
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 1rem;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.85rem;
-            color: #10b981;
-            height: 380px;
-            overflow-y: auto;
-            white-space: pre-wrap;
-        }
-        .metrics-bar {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 1rem;
-            margin-bottom: 1.5rem;
-        }
-        .metric-box {
-            background: var(--card);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 1rem;
-            text-align: center;
-        }
-        .metric-val { font-size: 1.4rem; font-weight: 700; color: #fff; margin-top: 0.25rem; }
-        .metric-label { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; }
-    </style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Calculate HOMA1 insulin resistance and beta-cell function indices locally in your browser from fasting glucose and insulin.">
+  <meta name="color-scheme" content="light">
+  <title>HOMA1-IR &amp; HOMA1-%B Calculator</title>
+  <link rel="stylesheet" href="./style.css">
+  <script type="module" src="./app.mjs"></script>
 </head>
 <body>
-
-    <div class="header">
-        <div class="header-title">
-            <h1>Homa Ir Calculator</h1>
-            <p>Domain: Clinical & Cryptographic AI | Standard: CAP / CLSI / NIST Standards | LabMind-Atlas Architecture</p>
+  <main class="shell">
+    <header class="site-head">
+      <div>
+        <div class="eyebrow">Metabolic research · HOMA1</div>
+        <h1>HOMA-IR &amp; β-cell function</h1>
+        <p class="lede">Calculate HOMA1-IR and HOMA1-%B from paired fasting glucose and insulin measurements.</p>
+      </div>
+      <span class="privacy">Local calculations · No data upload</span>
+    </header>
+    <div class="layout">
+      <section class="panel" aria-labelledby="calculator-heading">
+        <div class="panel-title"><h2 id="calculator-heading">Single calculation</h2><span class="step">01 / Calculate</span></div>
+        <form id="calculator" novalidate>
+          <div class="field">
+            <label for="glucose">Fasting glucose</label>
+            <div class="field-combo">
+              <input id="glucose" name="glucose" type="number" inputmode="decimal" min="0" step="any" placeholder="e.g. 90" required>
+              <select id="glucose-unit" name="glucose-unit" aria-label="Glucose unit">
+                <option value="mgdl">mg/dL</option>
+                <option value="mmol">mmol/L</option>
+              </select>
+            </div>
+          </div>
+          <div class="field">
+            <label for="insulin">Fasting insulin</label>
+            <div class="field-combo">
+              <input id="insulin" name="insulin" type="number" inputmode="decimal" min="0" step="any" placeholder="e.g. 10" required>
+              <span class="unit-label">µU/mL</span>
+            </div>
+            <p class="hint">µU/mL and mIU/L are numerically equivalent.</p>
+          </div>
+          <p id="error" class="error" role="alert" hidden></p>
+          <div class="actions">
+            <button class="primary" type="submit">Calculate indices</button>
+            <button class="secondary" type="button" id="clear">Clear</button>
+            <button class="tertiary" type="button" id="example">Load example</button>
+          </div>
+        </form>
+        <div id="results" class="results" aria-live="polite" hidden>
+          <h3>Calculated indices</h3>
+          <div class="result-grid">
+            <div class="result-box"><span>HOMA1-IR</span><strong id="ir-value"></strong><small>Dimensionless index</small></div>
+            <div class="result-box"><span>HOMA1-%B</span><strong id="b-value"></strong><small>Estimated β-cell function</small></div>
+          </div>
+          <p class="result-note" id="b-note"></p>
+          <p class="conversion">Normalized fasting glucose: <strong id="converted-glucose"></strong></p>
         </div>
-        <div>
-            <span class="badge">Air-Gapped Active</span>
-            <span class="badge" style="background: rgba(16,185,129,0.2); color: #10b981; border-color: #10b981;">Zero-PHI Guard Active</span>
+      </section>
+      <aside class="panel guide" aria-labelledby="method-heading">
+        <div class="panel-title"><h2 id="method-heading">Method &amp; interpretation</h2><span class="step">HOMA1 model</span></div>
+        <div class="formula"><span>Insulin resistance</span><code>HOMA1-IR = (G × I) / 22.5</code></div>
+        <div class="formula"><span>β-cell function</span><code>HOMA1-%B = (20 × I) / (G − 3.5)</code></div>
+        <p class="hint">G is fasting glucose in mmol/L; I is fasting insulin in µU/mL. Glucose in mg/dL is divided by 18 before calculation.</p>
+        <div class="notice">
+          <h3>Important limitations</h3>
+          <p>There is <strong>no universal diagnostic HOMA-IR cutoff</strong>. Results depend on assay, population and clinical context. HOMA1 is an approximation and is not equivalent to Oxford HOMA2 or a direct insulin-sensitivity measurement.</p>
+          <p>HOMA1-%B is undefined when glucose is ≤ 3.5 mmol/L. Use fasting samples collected together. Do not use the result alone to diagnose a condition or guide treatment.</p>
         </div>
+        <p class="reference">Method: <a href="https://www.rdm.ox.ac.uk/about/our-facilities-and-units/DTU/software/homa/faq" target="_blank" rel="noopener noreferrer">Oxford HOMA documentation ↗</a></p>
+      </aside>
     </div>
-
-    <div class="metrics-bar">
-        <div class="metric-box">
-            <div class="metric-label">System Status</div>
-            <div class="metric-val" style="color: var(--success);" id="m-status">OPTIMAL</div>
-        </div>
-        <div class="metric-box">
-            <div class="metric-label">Tasks Processed</div>
-            <div class="metric-val" id="m-tasks">142</div>
-        </div>
-        <div class="metric-box">
-            <div class="metric-label">Audit Blocks Signed</div>
-            <div class="metric-val" id="m-audit">142</div>
-        </div>
-        <div class="metric-box">
-            <div class="metric-label">PHI Interceptions</div>
-            <div class="metric-val" style="color: var(--accent);" id="m-phi">0</div>
-        </div>
-    </div>
-
-    <div class="grid">
-        <div class="card">
-            <h2>⚙️ Dispatch Distributed Component Audit</h2>
-            <div class="form-group">
-                <label>Task / Sample ID</label>
-                <input type="text" id="task_id" value="TASK-2026-LIVE-01">
-            </div>
-            <div class="form-group">
-                <label>Target Identifier</label>
-                <input type="text" id="target_id" value="SPECIMEN-ALPHA-77">
-            </div>
-            <div class="form-group">
-                <label>Primary Measurement / Value</label>
-                <input type="number" id="primary_metric" value="29.4" step="0.1">
-            </div>
-            <div class="form-group">
-                <label>Secondary Metric / Kinetic Index</label>
-                <input type="number" id="secondary_metric" value="14.8" step="0.1">
-            </div>
-            <div class="form-group">
-                <label>Status / Phenotype Descriptor</label>
-                <input type="text" id="status_descriptor" value="DISCORDANT_ANOMALY">
-            </div>
-            <div class="form-group">
-                <label><input type="checkbox" id="is_critical" checked> Trigger Emergency / Critical Flag</label>
-            </div>
-            <button class="btn" onclick="runAudit()">Execute Distributed Component Audit</button>
-        </div>
-
-        <div class="card">
-            <h2>📊 Real-Time Consensus Dossier & Audit Log</h2>
-            <div class="terminal" id="outputConsole">// Homa Ir Calculator Operations Console Ready
-// Connection established with Air-Gapped Supervisor
-// Cryptographic HMAC-SHA256 audit ledger loaded.
-// Ready for live task payload dispatch...</div>
-        </div>
-    </div>
-
-    <script>
-        async function runAudit() {
-            const consoleEl = document.getElementById('outputConsole');
-            consoleEl.innerText = "// Dispatching task across specialized workers...
-// Invoking InvariantQCWorker, SafetyEscalationWorker, ProtocolWorker...";
-
-            const payload = {
-                task_id: document.getElementById('task_id').value,
-                target_identifier: document.getElementById('target_id').value,
-                primary_metric: parseFloat(document.getElementById('primary_metric').value),
-                secondary_metric: parseFloat(document.getElementById('secondary_metric').value),
-                status_descriptor: document.getElementById('status_descriptor').value,
-                is_critical_flag: document.getElementById('is_critical').checked
-            };
-
-            try {
-                const res = await fetch('/api/audit', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-                const data = await res.json();
-                consoleEl.innerText = JSON.stringify(data, null, 2);
-                document.getElementById('m-tasks').innerText = parseInt(document.getElementById('m-tasks').innerText) + 1;
-                document.getElementById('m-audit').innerText = parseInt(document.getElementById('m-audit').innerText) + 1;
-            } catch (err) {
-                consoleEl.innerText = "// Offline / Simulation Output:\n" + JSON.stringify({
-                    dossier_id: "DOSSIER-SIM-" + Math.floor(Math.random()*10000),
-                    system: "homa-ir-calculator",
-                    domain: "Clinical & Cryptographic AI",
-                    task_id: payload.task_id,
-                    overall_urgency: payload.is_critical_flag ? "CRITICAL_STAT_PANIC" : "ELEVATED_RISK",
-                    integrity_status: "DISCORDANT_ANOMALY",
-                    alerts: [
-                        { worker: "InvariantQCWorker", alert: "Primary metric exceeds upper reference bound" },
-                        { worker: "SafetyEscalationWorker", alert: "Critical emergency interlock flag active" }
-                    ],
-                    audit_hash: "HMAC_SHA256_e83f9a72b941d6c381f9"
-                }, null, 2);
-            }
-        }
-    </script>
+    <section class="panel batch" aria-labelledby="batch-heading">
+      <div class="panel-title"><h2 id="batch-heading">Batch CSV processing</h2><span class="step">02 / Optional</span></div>
+      <p>Upload a CSV with <code>glucose_mmol</code> or <code>glucose_mgdl</code> and <code>insulin_mu_u_ml</code> columns. Other columns are preserved. Each row is checked independently.</p>
+      <div class="batch-controls">
+        <label for="batch-file" class="file-label">Choose CSV <span class="small">Up to 1 MB / 5,000 rows</span></label>
+        <input type="file" id="batch-file" accept=".csv,text/csv">
+        <button id="download" type="button" class="secondary" hidden>Download results CSV</button>
+      </div>
+      <p id="batch-status" role="status" aria-live="polite"></p>
+      <div id="batch-preview" class="table-scroll"></div>
+    </section>
+    <footer>
+      <span>HOMA1 arithmetic for education and research; not a clinical diagnostic device.</span>
+      <span>Files and values remain in your browser. No analytics or external calculation service.</span>
+    </footer>
+  </main>
 </body>
 </html>

@@ -1,17 +1,9 @@
-version: '3.8'
-
 services:
   homa-ir-calculator:
     build: .
-    container_name: homa-ir-calculator
     ports:
-      - "8000:8000"
+      - "127.0.0.1:${HOST_PORT:-8000}:8000"
     environment:
-      - AUDIT_SECRET_KEY=homa-ir-calculator-prod-audit-key-2026
-      - MODEL_PROVIDER=mock
+      AUDIT_SECRET_KEY: ${AUDIT_SECRET_KEY:?Set a unique AUDIT_SECRET_KEY in the environment or a local .env file}
+      MODEL_PROVIDER: mock
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 5s
-      retries: 3

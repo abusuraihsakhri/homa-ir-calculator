@@ -11,48 +11,56 @@ import os
 import sys
 
 
+def _positive_finite(value, name):
+    """Parse a positive finite measurement; reject booleans and nonnumbers."""
+    if isinstance(value, bool):
+        raise ValueError(f"{name} must be a positive finite number.")
+    try:
+        number = float(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{name} must be a positive finite number.") from exc
+    if not math.isfinite(number) or number <= 0:
+        raise ValueError(f"{name} must be a positive finite number.")
+    return number
+
+
 def calculate_homa_ir(glucose_mmol: float, insulin_mu_u_ml: float) -> dict:
-    """
-    Calculate HOMA-IR (Homeostatic Model Assessment of Insulin Resistance).
-    Formula: HOMA-IR = (fasting glucose [mmol/L] * fasting insulin [μU/mL]) / 22.5
+    """Calculate the HOMA1-IR approximation from paired fasting values.
 
-    Normal HOMA-IR is typically < 2.5; values > 2.5 suggest insulin resistance.
+    The 2.5 threshold is a legacy illustrative flag, NOT a diagnostic cutoff.
+    HOMA indices have no universal normal/reference cutoff.
     """
-    if glucose_mmol <= 0 or insulin_mu_u_ml <= 0:
-        raise ValueError("Glucose and insulin values must be positive numbers.")
-    score = (glucose_mmol * insulin_mu_u_ml) / 22.5
-    result = {
+    glucose = _positive_finite(glucose_mmol, "Glucose")
+    insulin = _positive_finite(insulin_mu_u_ml, "Insulin")
+    score = glucose * insulin / 22.5
+    if not math.isfinite(score):
+        raise ValueError("HOMA-IR exceeds the supported numeric range.")
+    return {
         "homa_ir": round(score, 2),
-        "glucose_mmol": round(glucose_mmol, 2),
-        "insulin_mu_u_ml": round(insulin_mu_u_ml, 2),
-        "insulin_resistance": score > 2.5,
+        "glucose_mmol": round(glucose, 2),
+        "insulin_mu_u_ml": round(insulin, 2),
+        "insulin_resistance": score > 2.5,  # deprecated legacy example flag
+        "interpretation_note": "HOMA1 estimate; the legacy 2.5 flag is not diagnostic.",
     }
-    return result
-
 
 def calculate_homa_b(glucose_mmol: float, insulin_mu_u_ml: float) -> dict:
-    """
-    Calculate HOMA-B (Homeostatic Model Assessment of Beta-cell function).
-    Formula: HOMA-B = (20 * fasting insulin [μU/mL]) / (fasting glucose [mmol/L] - 3.5)
-
-    Normal HOMA-B is typically 100-160%; lower values suggest beta-cell dysfunction.
-    """
-    if glucose_mmol <= 0 or insulin_mu_u_ml <= 0:
-        raise ValueError("Glucose and insulin values must be positive numbers.")
-    if glucose_mmol <= 3.5:
+    """Calculate HOMA1-%B; valid only when fasting glucose exceeds 3.5 mmol/L."""
+    glucose = _positive_finite(glucose_mmol, "Glucose")
+    insulin = _positive_finite(insulin_mu_u_ml, "Insulin")
+    if glucose <= 3.5:
         raise ValueError("Glucose must be > 3.5 mmol/L for HOMA-B calculation.")
-    score = (20 * insulin_mu_u_ml) / (glucose_mmol - 3.5)
-    result = {
+    score = (20 * insulin) / (glucose - 3.5)
+    if not math.isfinite(score):
+        raise ValueError("HOMA-B exceeds the supported numeric range.")
+    return {
         "homa_b": round(score, 2),
-        "glucose_mmol": round(glucose_mmol, 2),
-        "insulin_mu_u_ml": round(insulin_mu_u_ml, 2),
+        "glucose_mmol": round(glucose, 2),
+        "insulin_mu_u_ml": round(insulin, 2),
     }
-    return result
-
 
 def convert_glucose_mgdl_to_mmol(mgdl: float) -> float:
     """Convert glucose from mg/dL to mmol/L."""
-    return mgdl / 18.0
+    return _positive_finite(mgdl, "Glucose") / 18.0
 
 
 def calculate_score(**kwargs):
@@ -67,191 +75,198 @@ def calculate_score(**kwargs):
 
 
 def calculate_meld_na(bilirubin, creatinine, inr, sodium, dialysis, albumin=None, sex="M"):
-    """Calculate MELD-Na score for liver disease severity."""
+    """Calculate historical MELD-Na (not MELD 3.0); values in conventional units.
+
+    Bilirubin/creatinine in mg/dL, sodium in mmol/L. Albumin and sex are
+    accepted for legacy callers but do not enter the historical MELD-Na formula.
+    """
     try:
-        bili = float(bilirubin) if bilirubin is not None else 0.0
-        creat = float(creatinine) if creatinine is not None else 1.0
-        inr_val = float(inr) if inr is not None else 1.0
-        na = float(sodium) if sodium is not None else 140.0
-        dial = bool(dialysis)
-    except (ValueError, TypeError) as e:
-        return {"error": f"Invalid input for MELD-Na: {e}"}
-
-    # Cap creatinine at 4.0 for dialysis patients or if > 4.0
-    if dial:
-        creat = max(creat, 4.0)
-    creat = max(1.0, min(creat, 4.0))
-    bili = max(0.0, bili)
-    inr_val = max(0.0, inr_val)
-    na = max(125.0, min(na, 140.0))
-
-    meld = (0.957 * math.log(creat) + 0.378 * math.log(bili) + 1.120 * math.log(inr_val) + 0.643) * 10
-    meld_na = meld + 1.32 * (137 - na) - (0.033 * meld * (137 - na))
-    meld_na = max(6.0, round(meld_na, 1))
-
-    return {"meld_na": meld_na, "severity": "high" if meld_na >= 30 else "moderate" if meld_na >= 20 else "low"}
-
+        bili = _positive_finite(bilirubin, "Bilirubin")
+        creat = _positive_finite(creatinine, "Creatinine")
+        inr_val = _positive_finite(inr, "INR")
+        na = _positive_finite(sodium, "Sodium")
+        dial = dialysis if isinstance(dialysis, bool) else str(dialysis).lower() in {"1", "true", "yes"}
+        bili = max(1.0, bili)
+        creat = 4.0 if dial else min(4.0, max(1.0, creat))
+        inr_val = max(1.0, inr_val)
+        na = min(137.0, max(125.0, na))
+        meld = 10 * (0.957 * math.log(creat) + 0.378 * math.log(bili) + 1.120 * math.log(inr_val) + 0.643)
+        meld = min(40.0, max(6.0, meld))
+        adjusted = meld + 1.32 * (137 - na) - 0.033 * meld * (137 - na) if meld > 11 else meld
+        score = min(40.0, max(6.0, adjusted))
+    except (ValueError, TypeError, OverflowError) as exc:
+        return {"error": f"Invalid input for MELD-Na: {exc}"}
+    return {
+        "meld_na": round(score, 1),
+        "severity": "high" if score >= 30 else "moderate" if score >= 20 else "low",
+    }
 
 def calculate_qtc(qt_ms, rr_ms=None, hr_bpm=None):
-    """Calculate QTc (corrected QT interval) using Bazett's or Fridericia's formula."""
+    """QTc in milliseconds, with RR expressed in seconds within the formula."""
     try:
-        qt = float(qt_ms)
+        qt = _positive_finite(qt_ms, "QT")
         if rr_ms is not None:
-            rr = float(rr_ms) / 1000.0  # convert ms to seconds
+            rr = _positive_finite(rr_ms, "RR") / 1000.0
         elif hr_bpm is not None:
-            hr = float(hr_bpm)
-            if hr <= 0:
-                return {"error": "Heart rate must be positive."}
-            rr = 60.0 / hr
+            rr = 60.0 / _positive_finite(hr_bpm, "Heart rate")
         else:
             return {"error": "Either RR interval or heart rate is required."}
-    except (ValueError, TypeError) as e:
-        return {"error": f"Invalid input for QTc: {e}"}
-
-    if rr <= 0:
-        return {"error": "RR interval must be positive."}
-
-    qtc_bazett = qt / math.sqrt(rr) * 1000  # back to ms
-    qtc_fridericia = qt / (rr ** (1/3)) * 1000
-
+        bazett = qt / math.sqrt(rr)
+        fridericia = qt / (rr ** (1 / 3))
+        if not (math.isfinite(bazett) and math.isfinite(fridericia)):
+            raise ValueError("Calculated QTc is not finite.")
+    except (ValueError, TypeError, OverflowError) as exc:
+        return {"error": f"Invalid input for QTc: {exc}"}
     return {
-        "qtc_bazett_ms": round(qtc_bazett, 1),
-        "qtc_fridericia_ms": round(qtc_fridericia, 1),
-        "prolonged": qtc_bazett > 440,
+        "qtc_bazett_ms": round(bazett, 1),
+        "qtc_fridericia_ms": round(fridericia, 1),
+        "prolonged": bazett > 440,  # legacy illustrative cutoff, not a clinical diagnosis
     }
-
 
 def calculate_bmi_z(weight_kg, height_cm, age_months, sex="M"):
-    """Calculate BMI and approximate z-score for age."""
+    """Calculate BMI only; do not fabricate a growth-reference z-score.
+
+    Valid BMI-for-age z-scores require sex/age-specific validated LMS tables.
+    """
     try:
-        wt = float(weight_kg)
-        ht = float(height_cm) / 100.0  # convert to meters
-        age_m = float(age_months)
-    except (ValueError, TypeError) as e:
-        return {"error": f"Invalid input for BMI z-score: {e}"}
-
-    if ht <= 0 or wt <= 0:
-        return {"error": "Weight and height must be positive."}
-
-    bmi = wt / (ht * ht)
-    # Simplified z-score approximation (not WHO reference but reasonable)
-    # For children, BMI varies significantly with age
-    if age_m < 240:  # under 20 years
-        # Rough approximation: median BMI increases with age
-        median_bmi = 15.5 + (age_m / 240) * 3.0
-    else:
-        median_bmi = 22.0
-
-    sd = 1.5  # approximate standard deviation
-    z_score = (bmi - median_bmi) / sd
-
+        wt = _positive_finite(weight_kg, "Weight")
+        ht = _positive_finite(height_cm, "Height") / 100.0
+        age = float(age_months)
+        if not math.isfinite(age) or age < 0:
+            raise ValueError("Age must be a nonnegative finite number.")
+        bmi = wt / (ht * ht)
+        if not math.isfinite(bmi):
+            raise ValueError("BMI exceeds the supported numeric range.")
+    except (TypeError, ValueError, OverflowError) as exc:
+        return {"error": f"Invalid input for BMI: {exc}"}
     return {
         "bmi": round(bmi, 2),
-        "z_score": round(z_score, 2),
-        "category": "underweight" if z_score < -2 else "normal" if z_score < 1 else "overweight" if z_score < 2 else "obese",
+        "z_score": None,
+        "category": "not assessed",
+        "warning": "BMI-for-age z-score requires a validated sex- and age-specific growth reference.",
     }
-
 
 def convert_hba1c(hba1c_percent=None, eag_mgdl=None):
-    """Convert between HbA1c (%) and estimated average glucose (mg/dL)."""
-    if hba1c_percent is not None:
-        try:
-            hba1c = float(hba1c_percent)
-        except (ValueError, TypeError) as e:
-            return {"error": f"Invalid HbA1c value: {e}"}
-        # ADA formula: eAG (mg/dL) = 28.7 * HbA1c - 46.7
-        eag = 28.7 * hba1c - 46.7
-        return {"hba1c_percent": round(hba1c, 1), "eag_mgdl": round(eag, 1), "eag_mmol": round(eag / 18.0, 2)}
-    elif eag_mgdl is not None:
-        try:
-            eag = float(eag_mgdl)
-        except (ValueError, TypeError) as e:
-            return {"error": f"Invalid eAG value: {e}"}
-        hba1c = (eag + 46.7) / 28.7
-        return {"hba1c_percent": round(hba1c, 1), "eag_mgdl": round(eag, 1), "eag_mmol": round(eag / 18.0, 2)}
-    else:
+    """ADAG estimated average glucose/HbA1c conversion, not a diagnosis."""
+    if hba1c_percent is None and eag_mgdl is None:
         return {"error": "Either hba1c_percent or eag_mgdl must be provided."}
-
-
-def calculate_apri_fib4(ast_u_l, alt_u_l=None, platelets_109=None, age_years=None):
-    """Calculate APRI or FIB-4 score for liver fibrosis."""
     try:
-        ast = float(ast_u_l)
-        ast_upper_limit = 40.0  # typical ULN
-    except (ValueError, TypeError) as e:
-        return {"error": f"Invalid AST value: {e}"}
-
-    if age_years is not None and platelets_109 is not None:
-        # FIB-4 calculation
-        try:
-            age = float(age_years)
-            plt = float(platelets_109)
-            alt = float(alt_u_l) if alt_u_l is not None else 40.0
-        except (ValueError, TypeError) as e:
-            return {"error": f"Invalid input for FIB-4: {e}"}
-        if plt <= 0 or alt <= 0:
-            return {"error": "Platelets and ALT must be positive."}
-        fib4 = (age * ast) / (plt * math.sqrt(alt))
-        return {
-            "fib4": round(fib4, 2),
-            "fibrosis_risk": "high" if fib4 > 3.25 else "intermediate" if fib4 > 1.45 else "low",
-        }
-
-    # APRI calculation
-    apri = ((ast / ast_upper_limit) * 100) / (float(platelets_109) if platelets_109 else 200.0)
+        if hba1c_percent is not None:
+            hba1c = _positive_finite(hba1c_percent, "HbA1c")
+            eag = 28.7 * hba1c - 46.7
+            if eag <= 0:
+                raise ValueError("HbA1c is outside the formula's usable range.")
+        else:
+            eag = _positive_finite(eag_mgdl, "Estimated average glucose")
+            hba1c = (eag + 46.7) / 28.7
+        if not (math.isfinite(eag) and math.isfinite(hba1c)):
+            raise ValueError("Calculated value is not finite.")
+    except (TypeError, ValueError, OverflowError) as exc:
+        return {"error": f"Invalid HbA1c/eAG value: {exc}"}
     return {
-        "apri": round(apri, 2),
-        "fibrosis_risk": "significant" if apri > 1.5 else "moderate" if apri > 0.5 else "mild",
+        "hba1c_percent": round(hba1c, 1),
+        "eag_mgdl": round(eag, 1),
+        "eag_mmol": round(eag / 18.0, 2),
     }
 
+def calculate_apri_fib4(ast_u_l, alt_u_l=None, platelets_109=None, age_years=None, ast_uln=40.0):
+    """Compute FIB-4 when age and ALT are supplied, otherwise APRI.
+
+    Platelet count is mandatory for both; AST ULN defaults to 40 U/L for APRI.
+    """
+    try:
+        ast = _positive_finite(ast_u_l, "AST")
+        platelets = _positive_finite(platelets_109, "Platelets")
+        if age_years is not None:
+            age = _positive_finite(age_years, "Age")
+            alt = _positive_finite(alt_u_l, "ALT")
+            score = age * ast / (platelets * math.sqrt(alt))
+            if not math.isfinite(score):
+                raise ValueError("FIB-4 is not finite.")
+            return {
+                "fib4": round(score, 2),
+                "fibrosis_risk": "high" if score > 3.25 else "intermediate" if score > 1.45 else "low",
+            }
+        uln = _positive_finite(ast_uln, "AST upper limit of normal")
+        score = (ast / uln) * 100.0 / platelets
+        if not math.isfinite(score):
+            raise ValueError("APRI is not finite.")
+        return {
+            "apri": round(score, 2),
+            "fibrosis_risk": "significant" if score > 1.5 else "moderate" if score > 0.5 else "mild",
+        }
+    except (TypeError, ValueError, OverflowError) as exc:
+        return {"error": f"Invalid APRI/FIB-4 input: {exc}"}
 
 def assess_row(row):
+    """Select a supported calculation using explicit fields, never a pseudo-score."""
     try:
-        # HOMA-IR / HOMA-B (primary purpose)
-        if "glucose_mmol" in row or "glucose_mgdl" in row or "fasting_glucose" in row:
-            glucose = row.get("glucose_mmol") or row.get("fasting_glucose")
-            if glucose is None and "glucose_mgdl" in row:
-                glucose = convert_glucose_mgdl_to_mmol(float(row["glucose_mgdl"]))
-            insulin = row.get("insulin_mu_u_ml") or row.get("fasting_insulin") or row.get("insulin")
-            if glucose is not None and insulin is not None:
-                result = calculate_homa_ir(float(glucose), float(insulin))
-                result.update(calculate_homa_b(float(glucose), float(insulin)))
-                return result
-
-        # try common lab keys
+        if not isinstance(row, dict):
+            return {"error": "A JSON object or CSV row is required."}
+        has_glucose = any(k in row for k in ("glucose_mmol", "glucose_mgdl", "fasting_glucose"))
+        has_insulin = any(k in row for k in ("insulin_mu_u_ml", "fasting_insulin", "insulin"))
+        if has_glucose or has_insulin:
+            glucose = next((row[k] for k in ("glucose_mmol", "fasting_glucose") if row.get(k) not in (None, "")), None)
+            if glucose is None and row.get("glucose_mgdl") not in (None, ""):
+                glucose = convert_glucose_mgdl_to_mmol(row["glucose_mgdl"])
+            insulin = next((row[k] for k in ("insulin_mu_u_ml", "fasting_insulin", "insulin") if row.get(k) not in (None, "")), None)
+            if glucose is None or insulin is None:
+                return {"error": "Fasting glucose and insulin are both required."}
+            result = calculate_homa_ir(glucose, insulin)
+            if float(glucose) > 3.5:
+                result.update(calculate_homa_b(glucose, insulin))
+            else:
+                result["homa_b"] = None
+                result["homa_b_note"] = "HOMA-B is undefined at glucose <= 3.5 mmol/L."
+            return result
         if "bilirubin" in row and "creatinine" in row:
-            return calculate_meld_na(row.get("bilirubin"), row.get("creatinine"), row.get("inr"), row.get("sodium"), row.get("dialysis", "0") == "1", row.get("albumin"), row.get("sex", "M"))
+            return calculate_meld_na(row.get("bilirubin"), row.get("creatinine"), row.get("inr"), row.get("sodium"), row.get("dialysis", False), row.get("albumin"), row.get("sex", "M"))
         if "qt_ms" in row or "qt" in row:
-            return calculate_qtc(row.get("qt_ms") or row.get("qt"), row.get("rr_ms"), row.get("hr_bpm") or row.get("heart_rate"))
+            return calculate_qtc(row.get("qt_ms", row.get("qt")), row.get("rr_ms"), row.get("hr_bpm", row.get("heart_rate")))
         if "weight_kg" in row:
-            return calculate_bmi_z(row.get("weight_kg"), row.get("height_cm"), row.get("age_months") or row.get("age") or 60, row.get("sex", "M"))
+            return calculate_bmi_z(row.get("weight_kg"), row.get("height_cm"), row.get("age_months", row.get("age")), row.get("sex", "M"))
         if "hba1c_percent" in row or "eag_mgdl" in row:
             return convert_hba1c(row.get("hba1c_percent"), row.get("eag_mgdl"))
         if "ast_u_l" in row:
-            return calculate_apri_fib4(row.get("ast_u_l"), row.get("alt_u_l"), row.get("platelets_109"), row.get("age_years") or row.get("age"))
-        return calculate_score(**row)
-    except Exception as e:
-        return {"error": str(e)}
-
+            return calculate_apri_fib4(row.get("ast_u_l"), row.get("alt_u_l"), row.get("platelets_109"), row.get("age_years", row.get("age")))
+        return {"error": "Unsupported input fields; supply a documented clinical calculator schema."}
+    except (ValueError, TypeError, OverflowError) as exc:
+        return {"error": str(exc)}
 
 def _validate_safe_path(path_str: str) -> str:
-    """Validate that a file path is safe (no path traversal)."""
+    """Normalize a user-chosen local path; this is not a sandbox boundary."""
     # Check for null bytes
     if '\x00' in path_str:
         raise ValueError("Path contains null bytes.")
-    # Resolve to absolute path
+    # Command-line callers deliberately select their own filesystem paths.
     safe_path = os.path.abspath(path_str)
     return safe_path
+
+
+def _safe_csv_cell(value):
+    """Prefix cells that Excel/other spreadsheet programs may execute as formulas."""
+    if not isinstance(value, str):
+        return value
+    stripped = value.lstrip()
+    if stripped.startswith(("=", "+", "@", "\t", "\r")) or (
+        stripped.startswith("-") and not stripped[1:].replace(".", "", 1).isdigit()
+    ):
+        return "'" + value
+    return value
 
 
 def process_csv(inp, out):
     safe_inp = _validate_safe_path(inp)
     safe_out = _validate_safe_path(out)
 
+    if safe_inp == safe_out:
+        raise ValueError("Input and output CSV paths must differ.")
     with open(safe_inp, newline="", encoding="utf-8-sig") as f:
         r = csv.DictReader(f)
         rows = list(r)
         fieldnames = r.fieldnames
+    if not fieldnames:
+        raise ValueError("CSV input must include a header row.")
     results = []
     for row in rows:
         res = assess_row(row)
@@ -262,11 +277,11 @@ def process_csv(inp, out):
     for rr in results:
         all_keys.update(rr.keys())
     # keep original first
-    extra = [k for k in all_keys if k not in fieldnames]
+    extra = sorted(k for k in all_keys if k not in fieldnames)
     with open(safe_out, "w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=list(fieldnames) + extra)
         w.writeheader()
-        w.writerows(results)
+        w.writerows({k: _safe_csv_cell(v) for k, v in record.items()} for record in results)
     return results
 
 

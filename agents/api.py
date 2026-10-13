@@ -1,8 +1,12 @@
 """
 FastAPI REST API Server for Homa Ir Calculator.
 """
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
+from pathlib import Path
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import RedirectResponse
+from fastapi.staticfiles import StaticFiles
+from homa import assess_row
 from pydantic import BaseModel
 from .base import AuditLogger, PHIGuard
 from .models import SystemTaskPayload, ConsensusDossier
@@ -12,18 +16,46 @@ supervisor = SystemSupervisor(model_provider="mock")
 
 app = FastAPI(
     title="Homa Ir Calculator API",
-    description="Enterprise Distributed Component Platform (Clinical & Biomedical AI)",
+    description="HOMA1 calculations and optional demonstration audit workflows",
     version="3.0.0-ENTERPRISE",
 )
 
+
+app.mount("/web", StaticFiles(directory=str(Path(__file__).resolve().parent.parent / "web")), name="web")
 
 class ChatRequest(BaseModel):
     query: str
 
 
+
+
+class HomaRequest(BaseModel):
+    glucose_mmol: Optional[float] = None
+    glucose_mgdl: Optional[float] = None
+    insulin_mu_u_ml: Optional[float] = None
+
+
+@app.get("/", include_in_schema=False)
+def home():
+    return RedirectResponse(url="/web/index.html")
+
+
+@app.post("/api/homa")
+def api_homa(payload: HomaRequest):
+    """Compute validated HOMA1 values; no diagnostic category is assigned."""
+    data = payload.model_dump(exclude_none=True)
+    result = assess_row(data)
+    if "error" in result:
+        raise HTTPException(status_code=422, detail=result["error"])
+    # Do not expose the legacy illustrative diagnostic flag in the API.
+    result.pop("insulin_resistance", None)
+    result.pop("interpretation_note", None)
+    return result
+
+
 @app.get("/health")
 def health():
-    return {"status": "HEALTHY", "service": "homa-ir-calculator", "domain": "Clinical & Biomedical AI", "standard": "CAP / CLSI / ISO Standards", "version": "3.0.0-ENTERPRISE"}
+    return {"status": "HEALTHY", "service": "homa-ir-calculator", "domain": "Clinical & Biomedical AI", "standard": "Demonstration rules only", "version": "3.0.0-ENTERPRISE"}
 
 
 @app.get("/metrics")
