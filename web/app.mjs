@@ -3,8 +3,14 @@ export function calculateHoma(glucose, unit, insulin) {
   if (String(glucose).trim() === '' || String(insulin).trim() === '') {
     throw new Error('Enter both fasting glucose and fasting insulin.');
   }
-  const g = Number(glucose);
-  const i = Number(insulin);
+  const decimal = /^\+?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/;
+  const gText = String(glucose).trim();
+  const iText = String(insulin).trim();
+  if (!decimal.test(gText) || !decimal.test(iText)) {
+    throw new Error('Enter decimal glucose and insulin measurements.');
+  }
+  const g = Number(gText);
+  const i = Number(iText);
   if (!Number.isFinite(g) || g <= 0 || !Number.isFinite(i) || i <= 0) {
     throw new Error('Glucose and insulin must be positive finite numbers.');
   }
@@ -73,7 +79,8 @@ export function toCsv(rows, fields) {
   const escapeCell = (value) => {
     let s = value === null || value === undefined ? '' : String(value);
     // Block spreadsheet formula execution when exported files are opened.
-    if (/^[=+@\t\r]/.test(s) || (/^-/.test(s) && !/^-?\d+(\.\d+)?$/.test(s))) s = "'" + s;
+    const trimmed = s.trimStart();
+    if (/^[=+@]/.test(trimmed) || (/^-/.test(trimmed) && !/^-?\d+(\.\d+)?(?:[eE][+-]?\d+)?$/.test(trimmed))) s = "'" + s;
     return '"' + s.replace(/"/g, '""') + '"';
   };
   return [fields.map(escapeCell).join(','), ...rows.map(row => fields.map(k => escapeCell(row[k])).join(','))].join('\r\n') + '\r\n';
