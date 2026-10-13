@@ -74,3 +74,13 @@ def test_csv_batch_no_corruption_of_empty_input_and_stable_fields(tmp_path):
         assert len(list(reader)) == 2
     with pytest.raises(ValueError):
         homa.process_csv(str(input_path), str(input_path))
+
+
+def test_csv_formula_injection_is_escaped(tmp_path):
+    input_path = tmp_path / "input.csv"
+    output_path = tmp_path / "output.csv"
+    input_path.write_text("sample,glucose_mmol,insulin_mu_u_ml\n=1+1,5,10\n", encoding="utf-8")
+    homa.process_csv(str(input_path), str(output_path))
+    with output_path.open(newline="", encoding="utf-8") as stream:
+        result = next(csv.DictReader(stream))
+    assert result["sample"] == "'=1+1"
